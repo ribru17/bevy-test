@@ -4,6 +4,7 @@ use bevy::input::mouse::MouseMotion;
 
 const SPEED: f32 = 0.1;
 const SENS: f32 = 0.00012;
+const RENDER_DISTANCE: f32 = 50.0;
 
 // Keeps track of pitch and yaw
 #[derive(Default)]
@@ -22,6 +23,7 @@ fn main() {
         .add_startup_system(initial_grab_cursor)
         .add_system(button_system)
         .add_system(move_cam)
+        .add_system(enforce_render_distance)
         .run();
 }
 
@@ -30,8 +32,14 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    asset_server: Res<AssetServer>
+    asset_server: Res<AssetServer>,
+    mut windows: ResMut<Windows>,
 ) {
+    if let Some(window) = windows.get_primary_mut() {
+        window.set_title("RB GAME".to_string());
+
+    }
+
     // plane
     commands.spawn_bundle(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::Plane { size: 5.0 })),
@@ -92,7 +100,7 @@ fn setup(
                 // position: UiRect::all(Val::Px(0.0)),
                 ..default()
             },
-            visibility: Visibility { is_visible: false },
+            // visibility: Visibility { is_visible: false },
             color: Color::rgb(0.0, 0.5, 0.0).into(),
             ..default()
         })
@@ -111,6 +119,20 @@ fn setup(
                     ..default()
                 }),
             );
+            
+            parent.spawn_bundle(TextBundle::from_section(
+                " ",
+                TextStyle {
+                    font: asset_server.load("open-sans/OpenSans-Bold.ttf"),
+                    font_size: 50.0,
+                    color: Color::WHITE,
+                },
+                ).with_style(Style {
+                    margin: UiRect::all(Val::Px(5.0)),
+                    align_self: AlignSelf::Center,
+                    ..default()
+                })
+            );
 
             parent.spawn_bundle(ButtonBundle {
                 style: Style {
@@ -120,7 +142,7 @@ fn setup(
                     ..default()
                 },
                 color: Color::GRAY.into(),
-                visibility: Visibility { is_visible: false },
+                // visibility: Visibility { is_visible: false },
                 ..default()
             })
             .with_children(|parent| {
@@ -143,7 +165,7 @@ fn setup(
 
 fn move_cam(
     mut query: Query<(&Camera3d, &mut Transform)>,
-    mut menu_query: Query<(&Node, &mut Visibility), With<Children>>,
+    mut menu_query: Query<(&Node, &mut Visibility), Without<Parent>>,
     keys: Res<Input<KeyCode>>,
     mut motion_evr: EventReader<MouseMotion>,
     mut windows: ResMut<Windows>,
@@ -156,7 +178,9 @@ fn move_cam(
     } else {
         return;
     }
-    for (_camera, mut transform) in query.iter_mut() {
+    // for (_camera, mut transform) in query.iter_mut() {
+    let (_camera, mut transform) = query.single_mut();
+
         if keys.pressed(KeyCode::W) {
             let vec = transform.forward();
 
@@ -217,7 +241,7 @@ fn move_cam(
             transform.rotation = Quat::from_axis_angle(Vec3::Y, delta_state.yaw)
                 * Quat::from_axis_angle(Vec3::X, delta_state.pitch);
         }
-    }
+    // }
 }
 
 fn toggle_grab_cursor(window: &mut Window) {
@@ -240,11 +264,13 @@ fn initial_grab_cursor(mut windows: ResMut<Windows>) {
 }
 
 fn toggle_pause_menu(
-    query: &mut Query<(&Node, &mut Visibility), With<Children>>,
+    query: &mut Query<(&Node, &mut Visibility), Without<Parent>>,
 ) {
     // for (_node, mut visibility) in query.iter_mut().nth(0) {
     for (_node, mut visibility) in query.iter_mut() {
         visibility.is_visible = !visibility.is_visible;
+        println!("ran");
+
     }
 }
 
@@ -269,7 +295,7 @@ fn button_system(
                 }
             }
             Interaction::Hovered => {
-                text.sections[0].value = "You sure?".to_string();
+                text.sections[0].value = "Quit".to_string();
                 *color = Color::ORANGE_RED.into();
             }
             Interaction::None => {
@@ -277,6 +303,22 @@ fn button_system(
                 *color = Color::GRAY.into();
 
             }
+        }
+    }
+}
+
+fn enforce_render_distance(
+    query: Query<(Entity, &Transform), (Without<PointLight>, Without<Node>, Without<Camera3d>)>,
+    cam_query: Query<(&Camera3d, &Transform)>,
+    mut commands: Commands,
+) {
+    let (_cam, cam_transform) = cam_query.single();
+
+    for (e, transform) in query.iter() {
+        let diff = transform.translation + cam_transform.translation;
+        if diff.length() > RENDER_DISTANCE {
+            commands.entity(e).despawn();
+
         }
     }
 }
