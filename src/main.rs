@@ -53,9 +53,10 @@ fn setup(
     //     transform: Transform::from_xyz(0.0, 0.5, 0.0),
     //     ..default()
     // });
+    // sphere
     commands.spawn_bundle(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::UVSphere { radius: 1.0, sectors: 36, stacks: 36 })),
-        material: materials.add(Color::rgb(0.0, 0.0, 0.6).into()),
+        material: materials.add(Color::rgb(0.9, 0.6, 0.0).into()),
         transform: Transform::from_xyz(0.0, 1.0, 0.0),
         ..default()
     });
@@ -269,7 +270,7 @@ fn toggle_pause_menu(
     // for (_node, mut visibility) in query.iter_mut().nth(0) {
     for (_node, mut visibility) in query.iter_mut() {
         visibility.is_visible = !visibility.is_visible;
-        println!("ran");
+        // println!("ran");
 
     }
 }
@@ -308,16 +309,20 @@ fn button_system(
 }
 
 fn enforce_render_distance(
-    query: Query<(Entity, &Transform), (Without<PointLight>, Without<Node>, Without<Camera3d>)>,
+    mut query: Query<(Entity, &Transform, &mut Visibility), (Without<PointLight>, Without<Node>, Without<Camera3d>)>,
     cam_query: Query<(&Camera3d, &Transform)>,
-    mut commands: Commands,
+    // mut commands: Commands,
 ) {
     let (_cam, cam_transform) = cam_query.single();
 
-    for (e, transform) in query.iter() {
+    for (_e, transform, mut visibility) in query.iter_mut() {
         let diff = transform.translation + cam_transform.translation;
         if diff.length() > RENDER_DISTANCE {
-            commands.entity(e).despawn();
+            // commands.entity(e).despawn();
+            visibility.is_visible = false;
+
+        } else if visibility.is_visible == false {
+            visibility.is_visible = true;
 
         }
     }
